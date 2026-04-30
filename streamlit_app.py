@@ -37,7 +37,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 }
 
 /* ── Chat wrapper ── */
-.chat-wrapper { max-width: 760px; margin: 80px auto 180px; padding: 0 16px; }
+.chat-wrapper { max-width: 760px; margin: 80px auto 100px; padding: 0 16px; }
 
 /* ── Message rows ── */
 .msg-row { display: flex; gap: 12px; margin-bottom: 20px; animation: fadeUp 0.25s ease; }
