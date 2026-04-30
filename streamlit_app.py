@@ -10,7 +10,7 @@ st.write(
 )
 
 # Read secrets safely
-OLLAMA_HOST = st.secrets.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+OLLAMA_HOST = st.secrets.get("OLLAMA_HOST", {OLLAMA_HOST})
 OLLAMA_API_KEY = st.secrets.get("OLLAMA_API_KEY", "")
 
 # Build client
