@@ -16,141 +16,218 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-#MainMenu, footer, header { visibility: hidden; }
-.stApp { background: #0f0f11; }
 
-/* ── Streamlit block container — must have bottom padding so input never covers content ── */
+*, html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+    box-sizing: border-box;
+}
+#MainMenu, footer, header { visibility: hidden; }
+.stApp { background: #0d0d0f; }
+
+/* ── Block container ── */
 .main .block-container {
-    padding-top: 80px !important;
-    padding-bottom: 200px !important;
-    max-width: 760px !important;
+    padding-top: 64px !important;
+    padding-bottom: 130px !important;
+    max-width: 680px !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
 }
 
-/* ── Fixed nav bar ── */
+/* ── Nav ── */
 .nav-bar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 999;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 24px;
-    background: rgba(15,15,17,0.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 0 24px;
+    height: 48px;
+    background: rgba(13,13,15,0.95);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
 }
-.nav-brand { font-size: 1.1rem; font-weight: 600; color: #f5f5f5; letter-spacing: -0.3px; }
+.nav-brand {
+    font-size: 0.8rem; font-weight: 600; color: #d0d0d0;
+    letter-spacing: 0.01em; display: flex; align-items: center; gap: 6px;
+}
+.nav-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #c0392b; display: inline-block;
+}
 .nav-badge {
-    font-size: 0.7rem; font-weight: 500; padding: 2px 8px; border-radius: 99px;
-    background: rgba(220,50,50,0.18); color: #ff6b6b;
-    border: 1px solid rgba(220,50,50,0.3);
+    font-size: 0.65rem; font-weight: 500; padding: 2px 7px; border-radius: 99px;
+    background: rgba(255,255,255,0.05); color: #666;
+    border: 1px solid rgba(255,255,255,0.08);
+    letter-spacing: 0.02em;
 }
 
-/* ── Message rows ── */
+/* ── Messages ── */
 .msg-row {
-    display: flex; gap: 12px; margin-bottom: 20px;
-    animation: fadeUp 0.25s ease;
+    display: flex; gap: 10px; margin-bottom: 16px;
+    animation: fadeUp 0.2s ease;
 }
 .msg-row.user { flex-direction: row-reverse; }
 @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
 .avatar {
-    width: 34px; height: 34px; border-radius: 50%;
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0; margin-top: 2px;
+    font-size: 0.58rem; font-weight: 600; margin-top: 1px;
+    letter-spacing: 0.04em; text-transform: uppercase;
 }
-.avatar.bot { background: linear-gradient(135deg,#c0392b,#e74c3c); }
-.avatar.usr { background: linear-gradient(135deg,#2c3e50,#4a5568); }
+.avatar.bot { background: #1e1e24; color: #c0392b; border: 1px solid #2a2a32; }
+.avatar.usr { background: #1e1e24; color: #555; border: 1px solid #2a2a32; }
 
 .bubble {
-    max-width: 80%; padding: 12px 16px; border-radius: 16px;
-    font-size: 0.92rem; line-height: 1.65; color: #e8e8ea;
+    max-width: 82%; padding: 9px 13px; border-radius: 14px;
+    font-size: 0.8rem; line-height: 1.6; color: #c8c8cc;
     word-break: break-word;
 }
 .bubble.bot {
-    background: #1e1e24;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-top-left-radius: 4px;
+    background: #141418;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-top-left-radius: 3px;
+    color: #c0c0c6;
 }
 .bubble.usr {
-    background: linear-gradient(135deg,#c0392b,#a93226);
-    border-top-right-radius: 4px; color: #fff;
+    background: #1a1a20;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-top-right-radius: 3px;
+    color: #a8a8b0;
 }
 
-.ts { font-size: 0.7rem; color: #555; margin-top: 4px; }
+.ts {
+    font-size: 0.62rem; color: #3a3a42; margin-top: 3px;
+    letter-spacing: 0.02em;
+}
 .msg-row.user .ts { text-align: right; }
 
-/* ── Sources card ── */
+/* ── Sources ── */
 .sources-card {
-    margin-top: 8px; margin-bottom: 4px;
-    padding: 10px 14px;
-    background: #16161c; border: 1px solid #252530;
-    border-radius: 10px; font-size: 0.8rem; color: #888;
+    margin-top: 6px; margin-left: 36px;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid #1e1e26;
+    border-radius: 8px;
+    font-size: 0.72rem; color: #555;
 }
-.sources-card a { color: #e05252; text-decoration: none; }
-.sources-card a:hover { text-decoration: underline; }
+.sources-card .src-label {
+    font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #3a3a44; margin-bottom: 5px; font-weight: 600;
+}
+.sources-card a { color: #6a6a80; text-decoration: none; display: block; margin-bottom: 3px; }
+.sources-card a:hover { color: #c0392b; }
 
-/* ── Fixed input bar ── */
+/* ── Input bar ── */
 div[data-testid="stChatInput"] {
     position: fixed !important;
     bottom: 0 !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: min(760px, 100vw) !important;
-    padding: 12px 16px 20px !important;
-    background: rgba(15,15,17,0.96) !important;
-    backdrop-filter: blur(20px) !important;
-    border-top: 1px solid rgba(255,255,255,0.07) !important;
+    width: min(680px, 100vw) !important;
+    padding: 10px 20px 16px !important;
+    background: rgba(13,13,15,0.97) !important;
+    backdrop-filter: blur(24px) !important;
+    border-top: 1px solid rgba(255,255,255,0.05) !important;
     z-index: 998 !important;
-    box-sizing: border-box !important;
 }
 div[data-testid="stChatInput"] textarea {
-    background: #1a1a22 !important;
-    border: 1px solid #2e2e3a !important;
-    border-radius: 12px !important;
-    color: #e8e8ea !important;
-    font-size: 0.92rem !important;
+    background: #111115 !important;
+    border: 1px solid #222228 !important;
+    border-radius: 10px !important;
+    color: #c0c0c8 !important;
+    font-size: 0.8rem !important;
     font-family: 'Inter', sans-serif !important;
     resize: none !important;
-    padding: 12px 48px 12px 16px !important;
+    padding: 10px 44px 10px 14px !important;
     line-height: 1.5 !important;
+    min-height: 42px !important;
 }
 div[data-testid="stChatInput"] textarea:focus {
-    border-color: #c0392b !important;
-    box-shadow: 0 0 0 3px rgba(192,57,43,0.15) !important;
+    border-color: #2a2a35 !important;
+    box-shadow: none !important;
     outline: none !important;
 }
-div[data-testid="stChatInput"] textarea::placeholder { color: #555 !important; }
+div[data-testid="stChatInput"] textarea::placeholder {
+    color: #3a3a44 !important;
+    font-size: 0.78rem !important;
+}
+
+/* ── Spinner — floats ABOVE input bar ── */
+div[data-testid="stSpinner"] {
+    position: fixed !important;
+    bottom: 88px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: auto !important;
+    z-index: 999 !important;
+    pointer-events: none !important;
+}
+div[data-testid="stSpinner"] > div {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 0.72rem !important;
+    color: #666 !important;
+    background: #111115 !important;
+    border: 1px solid #222228 !important;
+    padding: 6px 14px !important;
+    border-radius: 99px !important;
+    backdrop-filter: blur(12px) !important;
+    white-space: nowrap !important;
+}
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {
-    background: #13131a !important;
-    border-right: 1px solid rgba(255,255,255,0.06) !important;
+    background: #0d0d0f !important;
+    border-right: 1px solid rgba(255,255,255,0.05) !important;
 }
+section[data-testid="stSidebar"] * { font-size: 0.78rem !important; }
 .sb-section {
-    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
-    text-transform: uppercase; color: #555; margin: 20px 0 8px;
+    font-size: 0.6rem !important; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #3a3a44; margin: 18px 0 6px;
 }
 .info-chip {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 10px; border-radius: 8px;
-    background: #1c1c24; border: 1px solid #2a2a35;
-    font-size: 0.78rem; color: #888; margin-bottom: 6px;
+    padding: 5px 9px; border-radius: 7px;
+    background: #111115; border: 1px solid #1e1e26;
+    font-size: 0.72rem !important; color: #555; margin-bottom: 5px;
 }
-.info-chip span.val { color: #bbb; font-weight: 500; }
-.info-chip .ok  { color: #27ae60; }
-.info-chip .bad { color: #e74c3c; }
+.info-chip span.val { color: #888; font-weight: 500; }
+.info-chip .ok  { color: #3d9e6a; }
+.info-chip .bad { color: #c0392b; }
 
-/* ── Empty / welcome state ── */
-.empty-state { text-align: center; padding: 60px 24px 32px; color: #444; }
-.empty-state .emoji { font-size: 3rem; margin-bottom: 12px; }
-.empty-state h2 { font-size: 1.6rem; color: #666; margin-bottom: 8px; font-weight: 600; }
-.empty-state p  { font-size: 0.9rem; color: #555; margin-bottom: 0; }
+/* ── Empty state ── */
+.empty-state {
+    text-align: center; padding: 72px 24px 28px;
+}
+.empty-state h2 {
+    font-size: 1rem; color: #555; margin-bottom: 6px;
+    font-weight: 500; letter-spacing: -0.01em;
+}
+.empty-state p { font-size: 0.75rem; color: #3a3a44; margin-bottom: 0; }
+
+/* ── Suggestion buttons ── */
+div[data-testid="stButton"] button {
+    background: #111115 !important;
+    border: 1px solid #1e1e26 !important;
+    border-radius: 8px !important;
+    color: #555 !important;
+    font-size: 0.74rem !important;
+    font-weight: 400 !important;
+    padding: 8px 12px !important;
+    transition: border-color 0.15s, color 0.15s !important;
+}
+div[data-testid="stButton"] button:hover {
+    border-color: #2e2e3a !important;
+    color: #888 !important;
+    background: #141418 !important;
+}
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2a2a38; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #1e1e26; border-radius: 3px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -168,20 +245,20 @@ client = Client(host=OLLAMA_HOST, headers=headers)
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # each: {role, content, ts, sources?}
+    st.session_state.messages = []  # {role, content, ts, sources?}
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## ⚙️ Settings")
+    st.markdown("**Settings**")
 
     st.markdown('<div class="sb-section">Model</div>', unsafe_allow_html=True)
-    model_name = st.text_input("Model name", value="qwen3:4b", label_visibility="collapsed")
+    model_name = st.text_input("Model", value="qwen3:4b", label_visibility="collapsed")
 
     st.markdown('<div class="sb-section">Behaviour</div>', unsafe_allow_html=True)
     temperature = st.slider("Temperature", 0.0, 1.5, 0.7, 0.1,
                             help="Higher = more creative · Lower = more precise")
-    use_web = st.toggle("🌐 Live web search", value=True,
-                        help="Augments every reply with real-time search results")
+    use_web = st.toggle("Live web search", value=True,
+                        help="Augments replies with real-time results")
 
     st.markdown('<div class="sb-section">Connection</div>', unsafe_allow_html=True)
     api_ok = bool(OLLAMA_API_KEY)
@@ -190,37 +267,38 @@ with st.sidebar:
     st.markdown(f"""
     <div class="info-chip">Host <span class="val">{host_short}</span></div>
     <div class="info-chip">API secret
-        <span class="{'ok' if api_ok else 'bad'} val">{'✓ set' if api_ok else '✗ missing'}</span>
+        <span class="{'ok' if api_ok else 'bad'} val">{'✓' if api_ok else '✗'}</span>
     </div>
     <div class="info-chip">Env key
-        <span class="{'ok' if env_ok else 'bad'} val">{'✓ set' if env_ok else '✗ missing'}</span>
+        <span class="{'ok' if env_ok else 'bad'} val">{'✓' if env_ok else '✗'}</span>
     </div>
     """, unsafe_allow_html=True)
 
     st.divider()
-    if st.button("🗑️  Clear conversation", use_container_width=True):
+    if st.button("Clear conversation", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
-    st.caption("TomatoPrincess AI · powered by Ollama")
+    st.caption("TomatoPrincess · Ollama")
 
 # ── Nav bar ───────────────────────────────────────────────────────────────────
+web_status = "web on" if use_web else "web off"
 st.markdown(f"""
 <div class="nav-bar">
-    <div class="nav-brand">🍅 TomatoPrincess AI</div>
-    <span class="nav-badge">{'🌐 Web on' if use_web else '📴 Web off'}</span>
+    <div class="nav-brand">
+        <span class="nav-dot"></span>
+        TomatoPrincess
+    </div>
+    <span class="nav-badge">{web_status}</span>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Helper functions ──────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def do_web_search(query: str, max_results: int = 5) -> dict:
     if not OLLAMA_API_KEY:
-        raise Exception("OLLAMA_API_KEY is missing — web search requires an API key.")
+        raise Exception("OLLAMA_API_KEY is missing.")
     resp = requests.post(
         "https://ollama.com/api/web_search",
-        headers={
-            "Authorization": f"Bearer {OLLAMA_API_KEY}",
-            "Content-Type": "application/json",
-        },
+        headers={"Authorization": f"Bearer {OLLAMA_API_KEY}", "Content-Type": "application/json"},
         json={"query": query, "max_results": max_results},
         timeout=30,
     )
@@ -232,9 +310,7 @@ def do_web_search(query: str, max_results: int = 5) -> dict:
 def build_search_context(results: dict):
     lines, sources = [], []
     for r in results.get("results", [])[:5]:
-        title   = r.get("title", "Untitled")
-        url     = r.get("url", "")
-        content = r.get("content", "")
+        title, url, content = r.get("title", "Untitled"), r.get("url", ""), r.get("content", "")
         lines.append(f"Title: {title}\nURL: {url}\nSnippet: {content}")
         if url:
             sources.append({"title": title, "url": url})
@@ -261,12 +337,9 @@ def ask_model(user_prompt: str, history: list, use_web: bool):
     messages.append({"role": "user", "content": user_prompt})
 
     response = client.chat(
-        model=model_name,
-        messages=messages,
-        options={"temperature": temperature},
+        model=model_name, messages=messages, options={"temperature": temperature}
     )
-    text = getattr(response.message, "content", "") or "No response generated."
-    return text, sources
+    return getattr(response.message, "content", "") or "No response generated.", sources
 
 
 def render_sources(sources: list):
@@ -274,11 +347,11 @@ def render_sources(sources: list):
         return
     deduped = list({s["url"]: s for s in sources}.values())
     links = "".join(
-        f'<a href="{s["url"]}" target="_blank">↗ {s["title"]}</a><br>'
+        f'<a href="{s["url"]}" target="_blank">↗ {s["title"]}</a>'
         for s in deduped
     )
     st.markdown(
-        f'<div class="sources-card"><strong>Sources</strong><br>{links}</div>',
+        f'<div class="sources-card"><div class="src-label">Sources</div>{links}</div>',
         unsafe_allow_html=True,
     )
 
@@ -288,49 +361,42 @@ def now_ts() -> str:
 
 
 SUGGESTIONS = [
-    "🌍 What's happening in the news today?",
-    "📈 Latest AI research highlights",
-    "🍅 What produce is in season right now?",
-    "💡 Give me a quick productivity tip",
+    "What's in the news today?",
+    "Latest AI research highlights",
+    "What produce is in season?",
+    "Give me a productivity tip",
 ]
 
-# ── Render conversation ───────────────────────────────────────────────────────
+# ── Conversation ──────────────────────────────────────────────────────────────
 if not st.session_state.messages:
-    # Welcome / empty state
     st.markdown("""
     <div class="empty-state">
-        <div class="emoji">🍅</div>
         <h2>What can I help with?</h2>
-        <p>Ask me anything — or pick a suggestion to get started.</p>
+        <p>Ask anything, or try a suggestion.</p>
     </div>
     """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
-    for i, suggestion in enumerate(SUGGESTIONS):
+    for i, s in enumerate(SUGGESTIONS):
         col = col1 if i % 2 == 0 else col2
-        if col.button(suggestion, use_container_width=True, key=f"sug_{i}"):
-            st.session_state.messages.append(
-                {"role": "user", "content": suggestion, "ts": now_ts()}
-            )
+        if col.button(s, use_container_width=True, key=f"sug_{i}"):
+            st.session_state.messages.append({"role": "user", "content": s, "ts": now_ts()})
             st.rerun()
-
 else:
     for msg in st.session_state.messages:
-        role    = msg["role"]
-        content = msg["content"]
-        ts      = msg.get("ts", "")
-        sources = msg.get("sources", [])
-        is_user = role == "user"
+        role, content = msg["role"], msg["content"]
+        ts, sources   = msg.get("ts", ""), msg.get("sources", [])
+        is_user       = role == "user"
 
         row_cls    = "msg-row user" if is_user else "msg-row"
         bubble_cls = "bubble usr"  if is_user else "bubble bot"
         avatar_cls = "avatar usr"  if is_user else "avatar bot"
-        icon       = "👤" if is_user else "🍅"
+        avatar_lbl = "you" if is_user else "ai"
         flex_extra = "" if is_user else 'style="flex:1;min-width:0"'
 
         st.markdown(f"""
         <div class="{row_cls}">
-            <div class="{avatar_cls}">{icon}</div>
+            <div class="{avatar_cls}">{avatar_lbl}</div>
             <div {flex_extra}>
                 <div class="{bubble_cls}">{content}</div>
                 <div class="ts">{ts}</div>
@@ -341,14 +407,15 @@ else:
         if not is_user:
             render_sources(sources)
 
-# ── Spacer so last message is never hidden behind the input bar ───────────────
-st.markdown("<div style='height:100px'></div>", unsafe_allow_html=True)
+# ── Spacer — keeps last message above input bar ───────────────────────────────
+st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 
-# ── Chat input ────────────────────────────────────────────────────────────────
-if prompt := st.chat_input("Message TomatoPrincess…"):
+# ── Input + thinking indicator ────────────────────────────────────────────────
+if prompt := st.chat_input("Message…"):
     st.session_state.messages.append({"role": "user", "content": prompt, "ts": now_ts()})
 
-    with st.spinner("Searching the web…" if use_web else "Thinking…"):
+    spinner_text = "Searching…" if use_web else "Thinking…"
+    with st.spinner(spinner_text):
         try:
             history = [
                 m for m in st.session_state.messages[:-1]
@@ -356,7 +423,7 @@ if prompt := st.chat_input("Message TomatoPrincess…"):
             ]
             response_text, sources = ask_model(prompt, history, use_web)
         except Exception as e:
-            response_text = f"⚠️ Error: {e}"
+            response_text = f"Error: {e}"
             sources = []
 
     st.session_state.messages.append({
