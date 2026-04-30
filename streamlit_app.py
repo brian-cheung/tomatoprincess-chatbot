@@ -246,6 +246,8 @@ client = Client(host=OLLAMA_HOST, headers=headers)
 # ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []  # {role, content, ts, sources?}
+if "use_web" not in st.session_state:
+    st.session_state.use_web = True
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -257,8 +259,26 @@ with st.sidebar:
     st.markdown('<div class="sb-section">Behaviour</div>', unsafe_allow_html=True)
     temperature = st.slider("Temperature", 0.0, 1.5, 0.7, 0.1,
                             help="Higher = more creative · Lower = more precise")
-    use_web = st.toggle("Live web search", value=True,
+    use_web = st.toggle("Live web search", key="use_web",
                         help="Augments replies with real-time results")
+    st.caption("Web search is " + ("enabled" if use_web else "disabled"))
+
+    st.markdown('<div class="sb-section">Chat history</div>', unsafe_allow_html=True)
+    if st.session_state.messages:
+        history_limit = min(10, len(st.session_state.messages))
+        for msg in st.session_state.messages[-history_limit:]:
+            role = "You" if msg.get("role") == "user" else "AI"
+            ts = msg.get("ts", "")
+            snippet = (msg.get("content", "") or "").strip().replace("\n", " ")
+            if len(snippet) > 80:
+                snippet = snippet[:77] + "..."
+            st.markdown(
+                f'<div class="info-chip"><span>{role} · {ts}</span>'
+                f'<span class="val">{snippet or "(empty)"}</span></div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.caption("No chat history yet.")
 
     st.markdown('<div class="sb-section">Connection</div>', unsafe_allow_html=True)
     api_ok = bool(OLLAMA_API_KEY)
