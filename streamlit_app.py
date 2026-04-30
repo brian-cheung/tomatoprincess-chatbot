@@ -20,12 +20,19 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 #MainMenu, footer, header { visibility: hidden; }
 .stApp { background: #0f0f11; }
 
+/* ── Streamlit block container — must have bottom padding so input never covers content ── */
+.main .block-container {
+    padding-top: 80px !important;
+    padding-bottom: 200px !important;
+    max-width: 760px !important;
+}
+
 /* ── Fixed nav bar ── */
 .nav-bar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 999;
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 24px;
-    background: rgba(15,15,17,0.88);
+    background: rgba(15,15,17,0.92);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(255,255,255,0.07);
 }
@@ -36,11 +43,11 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     border: 1px solid rgba(220,50,50,0.3);
 }
 
-/* ── Chat wrapper ── */
-.chat-wrapper { max-width: 760px; margin: 80px auto 300px; padding: 0 16px; }
-
 /* ── Message rows ── */
-.msg-row { display: flex; gap: 12px; margin-bottom: 20px; animation: fadeUp 0.25s ease; }
+.msg-row {
+    display: flex; gap: 12px; margin-bottom: 20px;
+    animation: fadeUp 0.25s ease;
+}
 .msg-row.user { flex-direction: row-reverse; }
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(8px); }
@@ -58,9 +65,11 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .bubble {
     max-width: 80%; padding: 12px 16px; border-radius: 16px;
     font-size: 0.92rem; line-height: 1.65; color: #e8e8ea;
+    word-break: break-word;
 }
 .bubble.bot {
-    background: #1e1e24; border: 1px solid rgba(255,255,255,0.07);
+    background: #1e1e24;
+    border: 1px solid rgba(255,255,255,0.07);
     border-top-left-radius: 4px;
 }
 .bubble.usr {
@@ -73,7 +82,8 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 /* ── Sources card ── */
 .sources-card {
-    margin-top: 8px; padding: 10px 14px;
+    margin-top: 8px; margin-bottom: 4px;
+    padding: 10px 14px;
     background: #16161c; border: 1px solid #252530;
     border-radius: 10px; font-size: 0.8rem; color: #888;
 }
@@ -81,21 +91,36 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .sources-card a:hover { text-decoration: underline; }
 
 /* ── Fixed input bar ── */
-.stChatInputContainer, div[data-testid="stChatInput"] {
-    position: fixed !important; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: min(760px, 100%); padding: 16px;
-    background: rgba(15,15,17,0.92); backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(255,255,255,0.06); z-index: 998;
+div[data-testid="stChatInput"] {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: min(760px, 100vw) !important;
+    padding: 12px 16px 20px !important;
+    background: rgba(15,15,17,0.96) !important;
+    backdrop-filter: blur(20px) !important;
+    border-top: 1px solid rgba(255,255,255,0.07) !important;
+    z-index: 998 !important;
+    box-sizing: border-box !important;
 }
 div[data-testid="stChatInput"] textarea {
-    background: #1a1a22 !important; border: 1px solid #2e2e3a !important;
-    border-radius: 12px !important; color: #e8e8ea !important;
-    font-size: 0.92rem !important; resize: none !important; padding: 12px 16px !important;
+    background: #1a1a22 !important;
+    border: 1px solid #2e2e3a !important;
+    border-radius: 12px !important;
+    color: #e8e8ea !important;
+    font-size: 0.92rem !important;
+    font-family: 'Inter', sans-serif !important;
+    resize: none !important;
+    padding: 12px 48px 12px 16px !important;
+    line-height: 1.5 !important;
 }
 div[data-testid="stChatInput"] textarea:focus {
     border-color: #c0392b !important;
     box-shadow: 0 0 0 3px rgba(192,57,43,0.15) !important;
+    outline: none !important;
 }
+div[data-testid="stChatInput"] textarea::placeholder { color: #555 !important; }
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {
@@ -117,9 +142,10 @@ section[data-testid="stSidebar"] {
 .info-chip .bad { color: #e74c3c; }
 
 /* ── Empty / welcome state ── */
-.empty-state { text-align: center; padding: 60px 24px; color: #444; }
-.empty-state h2 { font-size: 1.6rem; color: #666; margin-bottom: 8px; }
-.empty-state p  { font-size: 0.9rem; }
+.empty-state { text-align: center; padding: 60px 24px 32px; color: #444; }
+.empty-state .emoji { font-size: 3rem; margin-bottom: 12px; }
+.empty-state h2 { font-size: 1.6rem; color: #666; margin-bottom: 8px; font-weight: 600; }
+.empty-state p  { font-size: 0.9rem; color: #555; margin-bottom: 0; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
@@ -269,21 +295,20 @@ SUGGESTIONS = [
 ]
 
 # ── Render conversation ───────────────────────────────────────────────────────
-st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
-
 if not st.session_state.messages:
     # Welcome / empty state
     st.markdown("""
     <div class="empty-state">
-        <div style="font-size:3rem;margin-bottom:12px">🍅</div>
+        <div class="emoji">🍅</div>
         <h2>What can I help with?</h2>
         <p>Ask me anything — or pick a suggestion to get started.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    cols = st.columns(2)
+    col1, col2 = st.columns(2)
     for i, suggestion in enumerate(SUGGESTIONS):
-        if cols[i % 2].button(suggestion, use_container_width=True, key=f"sug_{i}"):
+        col = col1 if i % 2 == 0 else col2
+        if col.button(suggestion, use_container_width=True, key=f"sug_{i}"):
             st.session_state.messages.append(
                 {"role": "user", "content": suggestion, "ts": now_ts()}
             )
@@ -316,7 +341,8 @@ else:
         if not is_user:
             render_sources(sources)
 
-st.markdown("</div>", unsafe_allow_html=True)
+# ── Spacer so last message is never hidden behind the input bar ───────────────
+st.markdown("<div style='height:100px'></div>", unsafe_allow_html=True)
 
 # ── Chat input ────────────────────────────────────────────────────────────────
 if prompt := st.chat_input("Message TomatoPrincess…"):
