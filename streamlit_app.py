@@ -10,7 +10,7 @@ st.write(
 )
 
 # Read secrets safely
-OLLAMA_HOST = st.secrets.get("OLLAMA_HOST", {OLLAMA_HOST})
+OLLAMA_HOST = st.secrets.get("OLLAMA_HOST", "https://suburban-stable-matching-workshops.trycloudflare.com")
 OLLAMA_API_KEY = st.secrets.get("OLLAMA_API_KEY", "")
 
 # Build client
