@@ -1,5 +1,6 @@
 import os
 import time
+import html
 import requests
 import streamlit as st
 from ollama import Client
@@ -82,6 +83,7 @@ st.markdown("""
     max-width: 82%; padding: 9px 13px; border-radius: 14px;
     font-size: 0.8rem; line-height: 1.6; color: #c8c8cc;
     word-break: break-word;
+    white-space: pre-wrap;
 }
 .bubble.bot {
     background: #141418;
@@ -153,7 +155,7 @@ div[data-testid="stChatInput"] textarea::placeholder {
     font-size: 0.78rem !important;
 }
 
-/* ── Spinner — floats ABOVE input bar ── */
+/* ── Spinner ── */
 div[data-testid="stSpinner"] {
     position: fixed !important;
     bottom: 88px !important;
@@ -237,15 +239,37 @@ OLLAMA_HOST = st.secrets.get(
     "https://suburban-stable-matching-workshops.trycloudflare.com",
 )
 OLLAMA_API_KEY = st.secrets.get("OLLAMA_API_KEY", "")
+
 if OLLAMA_API_KEY:
     os.environ["OLLAMA_API_KEY"] = OLLAMA_API_KEY
 
-headers = {"Authorization": f"Bearer {OLLAMA_API_KEY}"} if OLLAMA_API_KEY else {}
-client = Client(host=OLLAMA_HOST, headers=headers)
+# Shared HTTP session for efficiency
+@st.cache_resource
+def get_http_session():
+    s = requests.Session()
+    s.headers.update({"Content-Type": "application/json"})
+    return s
+
+@st.cache_resource
+def get_ollama_client(host, api_key):
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    return Client(host=host, headers=headers)
+
+http = get_http_session()
+client = get_ollama_client(OLLAMA_HOST, OLLAMA_API_KEY)
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # {role, content, ts, sources?}
+    st.session_state.messages = []
+
+if "memory_summary" not in st.session_state:
+    st.session_state.memory_summary = ""
+
+if "turn_count" not in st.session_state:
+    st.session_state.turn_count = 0
+
+if "last_sources" not in st.session_state:
+    st.session_state.last_sources = []
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -255,15 +279,19 @@ with st.sidebar:
     model_name = st.text_input("Model", value="qwen3:4b", label_visibility="collapsed")
 
     st.markdown('<div class="sb-section">Behaviour</div>', unsafe_allow_html=True)
-    temperature = st.slider("Temperature", 0.0, 1.5, 0.7, 0.1,
-                            help="Higher = more creative · Lower = more precise")
-    use_web = st.toggle("Live web search", value=True,
-                        help="Augments replies with real-time results")
+    temperature = st.slider(
+        "Temperature", 0.0, 1.5, 0.7, 0.1,
+        help="Higher = more creative · Lower = more precise"
+    )
+    use_web = st.toggle(
+        "Live web search", value=True,
+        help="Augments replies with real-time results"
+    )
 
     st.markdown('<div class="sb-section">Connection</div>', unsafe_allow_html=True)
     api_ok = bool(OLLAMA_API_KEY)
     env_ok = bool(os.environ.get("OLLAMA_API_KEY"))
-    host_short = OLLAMA_HOST.replace("https://", "").split(".")[0] + "…"
+    host_short = OLLAMA_HOST.replace("https://", "").replace("http://", "").split(".")[0] + "…"
     st.markdown(f"""
     <div class="info-chip">Host <span class="val">{host_short}</span></div>
     <div class="info-chip">API secret
@@ -272,11 +300,15 @@ with st.sidebar:
     <div class="info-chip">Env key
         <span class="{'ok' if env_ok else 'bad'} val">{'✓' if env_ok else '✗'}</span>
     </div>
+    <div class="info-chip">Turns <span class="val">{st.session_state.turn_count}</span></div>
     """, unsafe_allow_html=True)
 
     st.divider()
     if st.button("Clear conversation", use_container_width=True):
         st.session_state.messages = []
+        st.session_state.memory_summary = ""
+        st.session_state.turn_count = 0
+        st.session_state.last_sources = []
         st.rerun()
     st.caption("TomatoPrincess · Ollama")
 
@@ -293,72 +325,165 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def do_web_search(query: str, max_results: int = 5) -> dict:
+def now_ts():
+    return time.strftime("%H:%M")
+
+def safe_html_text(text):
+    return html.escape(text).replace("\n", "<br>")
+
+def dedupe_sources(sources):
+    seen = set()
+    out = []
+    for s in sources:
+        url = s.get("url", "").strip()
+        if url and url not in seen:
+            seen.add(url)
+            out.append({"title": s.get("title", "Source"), "url": url})
+    return out
+
+def do_web_search(query, max_results=5, retries=2, timeout=20):
     if not OLLAMA_API_KEY:
         raise Exception("OLLAMA_API_KEY is missing.")
-    resp = requests.post(
-        "https://ollama.com/api/web_search",
-        headers={"Authorization": f"Bearer {OLLAMA_API_KEY}", "Content-Type": "application/json"},
-        json={"query": query, "max_results": max_results},
-        timeout=30,
-    )
-    if resp.status_code != 200:
-        raise Exception(f"Web search failed ({resp.status_code}): {resp.text}")
-    return resp.json()
 
+    last_err = None
+    for _ in range(retries + 1):
+        try:
+            resp = http.post(
+                "https://ollama.com/api/web_search",
+                headers={"Authorization": f"Bearer {OLLAMA_API_KEY}"},
+                json={"query": query, "max_results": max_results},
+                timeout=timeout,
+            )
+            if resp.status_code != 200:
+                raise Exception(f"Web search failed ({resp.status_code}): {resp.text[:300]}")
+            return resp.json()
+        except Exception as e:
+            last_err = e
+            time.sleep(0.6)
+    raise last_err
 
-def build_search_context(results: dict):
-    lines, sources = [], []
+def build_search_context(results):
+    lines = []
+    sources = []
     for r in results.get("results", [])[:5]:
-        title, url, content = r.get("title", "Untitled"), r.get("url", ""), r.get("content", "")
+        title = r.get("title", "Untitled")
+        url = r.get("url", "")
+        content = r.get("content", "")[:700]
         lines.append(f"Title: {title}\nURL: {url}\nSnippet: {content}")
         if url:
             sources.append({"title": title, "url": url})
-    return "\n\n".join(lines), sources
+    return "\n\n".join(lines), dedupe_sources(sources)
 
+def get_recent_history(messages, max_pairs=6):
+    filtered = [m for m in messages if m["role"] in ("user", "assistant")]
+    return filtered[-max_pairs * 2:]
 
-def ask_model(user_prompt: str, history: list, use_web: bool):
-    web_context, sources = "", []
+def update_memory_summary():
+    recent = get_recent_history(st.session_state.messages, max_pairs=4)
+    if not recent:
+        return
+
+    convo_text = []
+    for m in recent:
+        role = "User" if m["role"] == "user" else "Assistant"
+        convo_text.append(f"{role}: {m['content']}")
+    convo_text = "\n".join(convo_text)
+
+    prompt = f"""
+You are maintaining a compact conversation memory.
+Update the memory summary using the recent dialogue below.
+
+Existing memory summary:
+{st.session_state.memory_summary}
+
+Recent dialogue:
+{convo_text}
+
+Instructions:
+- Keep only durable, helpful context from this conversation.
+- Include user preferences, goals, names, constraints, and unresolved tasks.
+- Keep it concise.
+- Max 120 words.
+- Return only the updated memory summary.
+""".strip()
+
+    try:
+        response = client.chat(
+            model=model_name,
+            messages=[{"role": "system", "content": prompt}],
+            options={"temperature": 0.2},
+        )
+        summary = getattr(response.message, "content", "").strip()
+        if summary:
+            st.session_state.memory_summary = summary[:1200]
+    except Exception:
+        pass
+
+def ask_model(user_prompt, history, use_web):
+    web_context = ""
+    sources = []
+
     if use_web:
-        results = do_web_search(user_prompt)
-        web_context, sources = build_search_context(results)
+        try:
+            results = do_web_search(user_prompt, max_results=5)
+            web_context, sources = build_search_context(results)
+        except Exception as e:
+            sources = [{"title": "Web search unavailable", "url": ""}]
+            web_context = f"Web search error: {e}"
 
-    system = (
-        "You are a helpful, concise assistant. "
-        "When web results are provided, use them to answer with current information. "
-        "When no results are provided, answer from your own knowledge."
-    )
+    system = """
+You are TomatoPrincess AI, a helpful, concise assistant.
+Use a warm but direct tone.
+
+Rules:
+- If web search results are provided, use them for current facts.
+- If web search failed or no web results are available, be honest about limits.
+- Use conversation memory when relevant.
+- Keep answers concise but useful.
+- Do not repeat the user's question.
+""".strip()
+
     messages = [{"role": "system", "content": system}]
-    for m in history:
-        if m["role"] in ("user", "assistant"):
-            messages.append({"role": m["role"], "content": m["content"]})
+
+    if st.session_state.memory_summary:
+        messages.append({
+            "role": "system",
+            "content": f"Conversation memory:\n{st.session_state.memory_summary}"
+        })
+
+    recent_history = get_recent_history(history, max_pairs=6)
+    for m in recent_history:
+        messages.append({"role": m["role"], "content": m["content"]})
+
     if web_context:
-        messages.append({"role": "system", "content": f"Web search results:\n\n{web_context}"})
+        messages.append({
+            "role": "system",
+            "content": f"Web search context:\n{web_context}"
+        })
+
     messages.append({"role": "user", "content": user_prompt})
 
     response = client.chat(
-        model=model_name, messages=messages, options={"temperature": temperature}
+        model=model_name,
+        messages=messages,
+        options={"temperature": temperature},
     )
-    return getattr(response.message, "content", "") or "No response generated.", sources
 
+    return getattr(response.message, "content", "") or "No response generated.", dedupe_sources(sources)
 
-def render_sources(sources: list):
-    if not sources:
+def render_sources(sources):
+    clean_sources = [s for s in sources if s.get("url")]
+    if not clean_sources:
         return
-    deduped = list({s["url"]: s for s in sources}.values())
+
     links = "".join(
-        f'<a href="{s["url"]}" target="_blank">↗ {s["title"]}</a>'
-        for s in deduped
+        f'<a href="{html.escape(s["url"])}" target="_blank" rel="noopener noreferrer">↗ {html.escape(s["title"])}</a>'
+        for s in clean_sources
     )
     st.markdown(
         f'<div class="sources-card"><div class="src-label">Sources</div>{links}</div>',
         unsafe_allow_html=True,
     )
-
-
-def now_ts() -> str:
-    return time.strftime("%H:%M")
-
 
 SUGGESTIONS = [
     "What's in the news today?",
@@ -384,13 +509,15 @@ if not st.session_state.messages:
             st.rerun()
 else:
     for msg in st.session_state.messages:
-        role, content = msg["role"], msg["content"]
-        ts, sources   = msg.get("ts", ""), msg.get("sources", [])
-        is_user       = role == "user"
+        role = msg["role"]
+        content = safe_html_text(msg["content"])
+        ts = msg.get("ts", "")
+        sources = msg.get("sources", [])
+        is_user = role == "user"
 
-        row_cls    = "msg-row user" if is_user else "msg-row"
-        bubble_cls = "bubble usr"  if is_user else "bubble bot"
-        avatar_cls = "avatar usr"  if is_user else "avatar bot"
+        row_cls = "msg-row user" if is_user else "msg-row"
+        bubble_cls = "bubble usr" if is_user else "bubble bot"
+        avatar_cls = "avatar usr" if is_user else "avatar bot"
         avatar_lbl = "you" if is_user else "ai"
         flex_extra = "" if is_user else 'style="flex:1;min-width:0"'
 
@@ -407,21 +534,23 @@ else:
         if not is_user:
             render_sources(sources)
 
-# ── Spacer — keeps last message above input bar ───────────────────────────────
+# ── Spacer ────────────────────────────────────────────────────────────────────
 st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 
-# ── Input + thinking indicator ────────────────────────────────────────────────
+# ── Input ─────────────────────────────────────────────────────────────────────
 if prompt := st.chat_input("Message…"):
-    st.session_state.messages.append({"role": "user", "content": prompt, "ts": now_ts()})
+    st.session_state.messages.append({
+        "role": "user",
+        "content": prompt.strip(),
+        "ts": now_ts()
+    })
 
     spinner_text = "Searching…" if use_web else "Thinking…"
+
     with st.spinner(spinner_text):
         try:
-            history = [
-                m for m in st.session_state.messages[:-1]
-                if m["role"] in ("user", "assistant")
-            ]
-            response_text, sources = ask_model(prompt, history, use_web)
+            history = st.session_state.messages[:-1]
+            response_text, sources = ask_model(prompt.strip(), history, use_web)
         except Exception as e:
             response_text = f"Error: {e}"
             sources = []
@@ -432,4 +561,11 @@ if prompt := st.chat_input("Message…"):
         "ts": now_ts(),
         "sources": sources,
     })
+
+    st.session_state.turn_count += 1
+
+    # Update compact memory every 2 turns for efficiency
+    if st.session_state.turn_count % 2 == 0:
+        update_memory_summary()
+
     st.rerun()
