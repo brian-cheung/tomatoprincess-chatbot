@@ -1,16 +1,21 @@
 import os
 import time
 import html
+import uuid
 import requests
 import streamlit as st
 from ollama import Client
+
+# ── Sidebar state bootstrap ───────────────────────────────────────────────────
+if "sidebar_state" not in st.session_state:
+    st.session_state.sidebar_state = "collapsed"
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="TomatoPrincess AI",
     page_icon="🍅",
     layout="centered",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state=st.session_state.sidebar_state,
 )
 
 # ── Global CSS ────────────────────────────────────────────────────────────────
@@ -199,6 +204,24 @@ section[data-testid="stSidebar"] * { font-size: 0.78rem !important; }
 .info-chip .ok  { color: #3d9e6a; }
 .info-chip .bad { color: #c0392b; }
 
+.history-card {
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border: 1px solid #1e1e26;
+    background: #111115;
+    border-radius: 8px;
+}
+.history-title {
+    color: #a0a0aa;
+    font-size: 0.73rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+.history-meta {
+    color: #4a4a55;
+    font-size: 0.65rem;
+}
+
 /* ── Empty state ── */
 .empty-state {
     text-align: center; padding: 72px 24px 28px;
@@ -243,12 +266,11 @@ OLLAMA_API_KEY = st.secrets.get("OLLAMA_API_KEY", "")
 if OLLAMA_API_KEY:
     os.environ["OLLAMA_API_KEY"] = OLLAMA_API_KEY
 
-# Shared HTTP session for efficiency
 @st.cache_resource
 def get_http_session():
-    s = requests.Session()
-    s.headers.update({"Content-Type": "application/json"})
-    return s
+    session = requests.Session()
+    session.headers.update({"Content-Type": "application/json"})
+    return session
 
 @st.cache_resource
 def get_ollama_client(host, api_key):
@@ -268,78 +290,77 @@ if "memory_summary" not in st.session_state:
 if "turn_count" not in st.session_state:
     st.session_state.turn_count = 0
 
-if "last_sources" not in st.session_state:
-    st.session_state.last_sources = []
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = {}
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("**Settings**")
-
-    st.markdown('<div class="sb-section">Model</div>', unsafe_allow_html=True)
-    model_name = st.text_input("Model", value="qwen3:4b", label_visibility="collapsed")
-
-    st.markdown('<div class="sb-section">Behaviour</div>', unsafe_allow_html=True)
-    temperature = st.slider(
-        "Temperature", 0.0, 1.5, 0.7, 0.1,
-        help="Higher = more creative · Lower = more precise"
-    )
-    use_web = st.toggle(
-        "Live web search", value=True,
-        help="Augments replies with real-time results"
-    )
-
-    st.markdown('<div class="sb-section">Connection</div>', unsafe_allow_html=True)
-    api_ok = bool(OLLAMA_API_KEY)
-    env_ok = bool(os.environ.get("OLLAMA_API_KEY"))
-    host_short = OLLAMA_HOST.replace("https://", "").replace("http://", "").split(".")[0] + "…"
-    st.markdown(f"""
-    <div class="info-chip">Host <span class="val">{host_short}</span></div>
-    <div class="info-chip">API secret
-        <span class="{'ok' if api_ok else 'bad'} val">{'✓' if api_ok else '✗'}</span>
-    </div>
-    <div class="info-chip">Env key
-        <span class="{'ok' if env_ok else 'bad'} val">{'✓' if env_ok else '✗'}</span>
-    </div>
-    <div class="info-chip">Turns <span class="val">{st.session_state.turn_count}</span></div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-    if st.button("Clear conversation", use_container_width=True):
-        st.session_state.messages = []
-        st.session_state.memory_summary = ""
-        st.session_state.turn_count = 0
-        st.session_state.last_sources = []
-        st.rerun()
-    st.caption("TomatoPrincess · Ollama")
-
-# ── Nav bar ───────────────────────────────────────────────────────────────────
-web_status = "web on" if use_web else "web off"
-st.markdown(f"""
-<div class="nav-bar">
-    <div class="nav-brand">
-        <span class="nav-dot"></span>
-        TomatoPrincess
-    </div>
-    <span class="nav-badge">{web_status}</span>
-</div>
-""", unsafe_allow_html=True)
+if "current_chat_id" not in st.session_state:
+    new_id = str(uuid.uuid4())
+    st.session_state.current_chat_id = new_id
+    st.session_state.chat_sessions[new_id] = {
+        "title": "New chat",
+        "created_at": time.strftime("%Y-%m-%d %H:%M"),
+        "messages": [],
+        "memory_summary": "",
+        "turn_count": 0,
+    }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def now_ts():
     return time.strftime("%H:%M")
+
+def new_chat_title(messages):
+    for m in messages:
+        if m["role"] == "user" and m["content"].strip():
+            text = m["content"].strip()
+            return text[:36] + ("…" if len(text) > 36 else "")
+    return "New chat"
+
+def sync_current_chat():
+    cid = st.session_state.current_chat_id
+    st.session_state.chat_sessions[cid] = {
+        "title": new_chat_title(st.session_state.messages),
+        "created_at": st.session_state.chat_sessions.get(cid, {}).get(
+            "created_at", time.strftime("%Y-%m-%d %H:%M")
+        ),
+        "messages": list(st.session_state.messages),
+        "memory_summary": st.session_state.memory_summary,
+        "turn_count": st.session_state.turn_count,
+    }
+
+def load_chat(chat_id):
+    chat = st.session_state.chat_sessions[chat_id]
+    st.session_state.current_chat_id = chat_id
+    st.session_state.messages = list(chat.get("messages", []))
+    st.session_state.memory_summary = chat.get("memory_summary", "")
+    st.session_state.turn_count = chat.get("turn_count", 0)
+
+def create_new_chat():
+    sync_current_chat()
+    chat_id = str(uuid.uuid4())
+    st.session_state.chat_sessions[chat_id] = {
+        "title": "New chat",
+        "created_at": time.strftime("%Y-%m-%d %H:%M"),
+        "messages": [],
+        "memory_summary": "",
+        "turn_count": 0,
+    }
+    st.session_state.current_chat_id = chat_id
+    st.session_state.messages = []
+    st.session_state.memory_summary = ""
+    st.session_state.turn_count = 0
 
 def safe_html_text(text):
     return html.escape(text).replace("\n", "<br>")
 
 def dedupe_sources(sources):
     seen = set()
-    out = []
+    result = []
     for s in sources:
         url = s.get("url", "").strip()
         if url and url not in seen:
             seen.add(url)
-            out.append({"title": s.get("title", "Source"), "url": url})
-    return out
+            result.append({"title": s.get("title", "Source"), "url": url})
+    return result
 
 def do_web_search(query, max_results=5, retries=2, timeout=20):
     if not OLLAMA_API_KEY:
@@ -378,7 +399,7 @@ def get_recent_history(messages, max_pairs=6):
     filtered = [m for m in messages if m["role"] in ("user", "assistant")]
     return filtered[-max_pairs * 2:]
 
-def update_memory_summary():
+def update_memory_summary(model_name):
     recent = get_recent_history(st.session_state.messages, max_pairs=4)
     if not recent:
         return
@@ -391,7 +412,6 @@ def update_memory_summary():
 
     prompt = f"""
 You are maintaining a compact conversation memory.
-Update the memory summary using the recent dialogue below.
 
 Existing memory summary:
 {st.session_state.memory_summary}
@@ -400,10 +420,10 @@ Recent dialogue:
 {convo_text}
 
 Instructions:
-- Keep only durable, helpful context from this conversation.
+- Keep durable context only.
 - Include user preferences, goals, names, constraints, and unresolved tasks.
 - Keep it concise.
-- Max 120 words.
+- Maximum 120 words.
 - Return only the updated memory summary.
 """.strip()
 
@@ -419,7 +439,7 @@ Instructions:
     except Exception:
         pass
 
-def ask_model(user_prompt, history, use_web):
+def ask_model(user_prompt, history, use_web, model_name, temperature):
     web_context = ""
     sources = []
 
@@ -428,8 +448,7 @@ def ask_model(user_prompt, history, use_web):
             results = do_web_search(user_prompt, max_results=5)
             web_context, sources = build_search_context(results)
         except Exception as e:
-            sources = [{"title": "Web search unavailable", "url": ""}]
-            web_context = f"Web search error: {e}"
+            web_context = f"Web search unavailable: {e}"
 
     system = """
 You are TomatoPrincess AI, a helpful, concise assistant.
@@ -437,10 +456,9 @@ Use a warm but direct tone.
 
 Rules:
 - If web search results are provided, use them for current facts.
-- If web search failed or no web results are available, be honest about limits.
+- If web search is off, do not pretend to have current live access.
 - Use conversation memory when relevant.
 - Keep answers concise but useful.
-- Do not repeat the user's question.
 """.strip()
 
     messages = [{"role": "system", "content": system}]
@@ -451,14 +469,13 @@ Rules:
             "content": f"Conversation memory:\n{st.session_state.memory_summary}"
         })
 
-    recent_history = get_recent_history(history, max_pairs=6)
-    for m in recent_history:
+    for m in get_recent_history(history, max_pairs=6):
         messages.append({"role": m["role"], "content": m["content"]})
 
     if web_context:
         messages.append({
             "role": "system",
-            "content": f"Web search context:\n{web_context}"
+            "content": f"Web context:\n{web_context}"
         })
 
     messages.append({"role": "user", "content": user_prompt})
@@ -469,7 +486,8 @@ Rules:
         options={"temperature": temperature},
     )
 
-    return getattr(response.message, "content", "") or "No response generated.", dedupe_sources(sources)
+    text = getattr(response.message, "content", "") or "No response generated."
+    return text, dedupe_sources(sources)
 
 def render_sources(sources):
     clean_sources = [s for s in sources if s.get("url")]
@@ -492,6 +510,101 @@ SUGGESTIONS = [
     "Give me a productivity tip",
 ]
 
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("**Settings**")
+
+    st.markdown('<div class="sb-section">Model</div>', unsafe_allow_html=True)
+    model_name = st.text_input("Model", value="qwen3:4b", label_visibility="collapsed")
+
+    st.markdown('<div class="sb-section">Behaviour</div>', unsafe_allow_html=True)
+    temperature = st.slider(
+        "Temperature", 0.0, 1.5, 0.7, 0.1,
+        help="Higher = more creative · Lower = more precise"
+    )
+    use_web = st.toggle(
+        "Live web search", value=True,
+        help="Turn live web search on or off"
+    )
+
+    st.markdown('<div class="sb-section">Connection</div>', unsafe_allow_html=True)
+    api_ok = bool(OLLAMA_API_KEY)
+    env_ok = bool(os.environ.get("OLLAMA_API_KEY"))
+    host_short = OLLAMA_HOST.replace("https://", "").replace("http://", "").split(".")[0] + "…"
+    st.markdown(f"""
+    <div class="info-chip">Host <span class="val">{host_short}</span></div>
+    <div class="info-chip">API secret
+        <span class="{'ok' if api_ok else 'bad'} val">{'✓' if api_ok else '✗'}</span>
+    </div>
+    <div class="info-chip">Env key
+        <span class="{'ok' if env_ok else 'bad'} val">{'✓' if env_ok else '✗'}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="sb-section">Chat history</div>', unsafe_allow_html=True)
+
+    if st.button("New chat", use_container_width=True):
+        create_new_chat()
+        st.rerun()
+
+    sorted_chats = sorted(
+        st.session_state.chat_sessions.items(),
+        key=lambda x: x[1].get("created_at", ""),
+        reverse=True
+    )
+
+    for chat_id, chat_data in sorted_chats:
+        title = chat_data.get("title", "New chat")
+        created_at = chat_data.get("created_at", "")
+        is_current = chat_id == st.session_state.current_chat_id
+
+        st.markdown(
+            f"""
+            <div class="history-card">
+                <div class="history-title">{html.escape(title)}</div>
+                <div class="history-meta">{created_at}{' · current' if is_current else ''}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if st.button(
+            f"Open: {title[:20]}",
+            key=f"open_{chat_id}",
+            use_container_width=True
+        ):
+            sync_current_chat()
+            load_chat(chat_id)
+            st.rerun()
+
+    st.divider()
+    if st.button("Clear current chat", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.memory_summary = ""
+        st.session_state.turn_count = 0
+        sync_current_chat()
+        st.rerun()
+
+    if st.button("Toggle sidebar", use_container_width=True):
+        st.session_state.sidebar_state = (
+            "expanded" if st.session_state.sidebar_state == "collapsed" else "collapsed"
+        )
+        st.rerun()
+
+    st.caption("TomatoPrincess · Ollama")
+
+# ── Nav bar ───────────────────────────────────────────────────────────────────
+web_status = "web on" if use_web else "web off"
+st.markdown(f"""
+<div class="nav-bar">
+    <div class="nav-brand">
+        <span class="nav-dot"></span>
+        TomatoPrincess
+    </div>
+    <span class="nav-badge">{web_status}</span>
+</div>
+""", unsafe_allow_html=True)
+
 # ── Conversation ──────────────────────────────────────────────────────────────
 if not st.session_state.messages:
     st.markdown("""
@@ -506,6 +619,7 @@ if not st.session_state.messages:
         col = col1 if i % 2 == 0 else col2
         if col.button(s, use_container_width=True, key=f"sug_{i}"):
             st.session_state.messages.append({"role": "user", "content": s, "ts": now_ts()})
+            sync_current_chat()
             st.rerun()
 else:
     for msg in st.session_state.messages:
@@ -539,18 +653,27 @@ st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 if prompt := st.chat_input("Message…"):
+    clean_prompt = prompt.strip()
+
+    # Show user question immediately and keep it in history
     st.session_state.messages.append({
         "role": "user",
-        "content": prompt.strip(),
+        "content": clean_prompt,
         "ts": now_ts()
     })
+    sync_current_chat()
 
     spinner_text = "Searching…" if use_web else "Thinking…"
-
     with st.spinner(spinner_text):
         try:
             history = st.session_state.messages[:-1]
-            response_text, sources = ask_model(prompt.strip(), history, use_web)
+            response_text, sources = ask_model(
+                clean_prompt,
+                history,
+                use_web,
+                model_name,
+                temperature
+            )
         except Exception as e:
             response_text = f"Error: {e}"
             sources = []
@@ -564,8 +687,8 @@ if prompt := st.chat_input("Message…"):
 
     st.session_state.turn_count += 1
 
-    # Update compact memory every 2 turns for efficiency
     if st.session_state.turn_count % 2 == 0:
-        update_memory_summary()
+        update_memory_summary(model_name)
 
+    sync_current_chat()
     st.rerun()
