@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="TomatoPrincess AI",
     page_icon="🍅",
     layout="centered",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ── Global CSS ────────────────────────────────────────────────────────────────
@@ -433,6 +433,15 @@ st.markdown("<div style='height:80px'></div>", unsafe_allow_html=True)
 # ── Input + thinking indicator ────────────────────────────────────────────────
 if prompt := st.chat_input("Message…"):
     st.session_state.messages.append({"role": "user", "content": prompt, "ts": now_ts()})
+    st.markdown(f"""
+    <div class="msg-row user">
+        <div class="avatar usr">you</div>
+        <div>
+            <div class="bubble usr">{prompt}</div>
+            <div class="ts">{st.session_state.messages[-1]["ts"]}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     spinner_text = "Searching…" if use_web else "Thinking…"
     with st.spinner(spinner_text):
