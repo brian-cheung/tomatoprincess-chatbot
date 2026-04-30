@@ -1,7 +1,7 @@
 import streamlit as st
 from ollama import Client
 
-st.set_page_config(page_title="TomatoPrincess Chatbot", page_icon="🍅", layout="centered")
+st.set_page_config(page_title="TomatoPrincess Chatbot", page_icon="🍅", layout="centered", initial_sidebar_state="collapsed")
 
 st.title("🍅 TomatoPrincess Chatbot")
 st.write(
